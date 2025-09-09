@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chat Interface</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+
+</head>
+<body>
+
+  <!-- Sidebar -->
+<aside>
+  <h2>Customization</h2>
+  <nav>
+    <label for="model-select">Select Model:</label>
+    <select id="model-select">
+      <option>gpt-4o</option>
+      <option>gpt-4o-mini</option>
+      <option>gpt-4-turbo</option>
+      <option>gpt-3.5-turbo</option>
+    </select>
+
+    <label for="memory-select" style="margin-top:12px;">Memory Section:</label>
+    <select id="memory-select">
+      <option value="">-- Empty --</option>
+    </select>
+
+    <div style="margin-top:12px; display:flex; align-items:center; gap:8px;">
+      <span>Remember things:</span>
+      <input type="checkbox" id="remember-toggle">
+    </div>
+
+    <hr style="border-color:#333; margin:12px 0;">
+
+  </nav>
+  <button>Delete data (wipe memory)</button>
+</aside>
+
+
+  <div class="main">
+    <!-- Top bar -->
+    <header>
+      <div class="balance">💰 Balance: <span>$120.50</span></div>
+      <div class="profile">Hello, <strong>User</strong> <img src="https://via.placeholder.com/40" alt="Profile"></div>
+    </header>
+
+    <!-- Chat area -->
+    <main id="chat-box">
+      <div class="message bot">Hi there 👋 How can I help you today?</div>
+    </main>
+
+    <!-- Chat input -->
+    <footer>
+      <form id="chat-form">
+        <input id="chat-input" type="text" placeholder="Type a message...">
+        <button type="submit">Send</button>
+      </form>
+    </footer>
+  </div>
+
+  <script>
+    const form = document.getElementById('chat-form');
+    const input = document.getElementById('chat-input');
+    const chatBox = document.getElementById('chat-box');
+
+    function addMessage(text, sender='user') {
+      const bubble = document.createElement('div');
+      bubble.className = `message ${sender}`;
+      bubble.innerHTML = marked.parse(text); // Markdown -> HTML
+      chatBox.appendChild(bubble);
+      chatBox.scrollTop = chatBox.scrollHeight;
+      hljs.highlightAll();
+    }
+
+    function getParameters() {
+  return {
+    model: document.getElementById("model-select").value,
+    memorySection: document.getElementById("memory-select").value,
+    remember: document.getElementById("remember-toggle").checked,
+    temperature: 1.0,
+    maxTokens: 256,
+    frequencyPenalty: 0.0,
+    presencePenalty: 0.0,
+    numResponses: 1,
+    topP: 1.0
+  };
+}
+
+
+    async function sendToBackend(message) {
+      const payload = { message: message, parameters: getParameters() };
+      try {
+        const response = await fetch("/chat/respond/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie("csrftoken")
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+        const data = await response.json();
+        addMessage(data.response || "No reply from server", "bot");
+      } catch (err) {
+        console.error(err);
+        addMessage("Error contacting server.", "bot");
+      }
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      addMessage(text, 'user');
+      input.value = '';
+      sendToBackend(text);
+    });
+
+    input.addEventListener('keypress', e => {
+      if (e.key === "Enter") form.dispatchEvent(new Event('submit'));
+    });
+
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+          cookie = cookie.trim();
+          if (cookie.startsWith(name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+  </script>
+</body>
+</html>
